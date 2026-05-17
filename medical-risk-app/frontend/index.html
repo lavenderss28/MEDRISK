@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MedRisk — Lab Report Analyser</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #F7F5F0; --surface: #FFFFFF; --surface2: #F0EDE8;
+      --border: #E2DDD6; --text: #1A1714; --text-muted: #7A746C; --text-faint: #B0A99F;
+      --accent: #2B5C8A;
+      --low: #3B6D11; --low-bg: #EAF3DE; --low-pill: #C0DD97;
+      --med: #854F0B; --med-bg: #FEF3E2; --med-pill: #FAC775;
+      --high: #A32D2D; --high-bg: #FCEAEA; --high-pill: #F7C1C1;
+      --critical: #7B1FA2; --critical-bg: #F3E5F5; --critical-pill: #CE93D8;
+      --radius: 10px;
+    }
+    body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; }
+    header { padding: 1.25rem 2rem; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--border); background: var(--surface); }
+    .logo { font-family: 'DM Serif Display', serif; font-size: 22px; color: var(--text); }
+    .logo span { color: var(--accent); font-style: italic; }
+    .tagline { margin-left: auto; font-size: 12px; color: var(--text-faint); font-weight: 300; }
+    main { flex: 1; max-width: 800px; width: 100%; margin: 0 auto; padding: 2.5rem 1.5rem; }
+
+    /* Upload */
+    .upload-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 2rem; }
+    .upload-card h1 { font-family: 'DM Serif Display', serif; font-size: 26px; font-weight: 400; margin-bottom: 6px; }
+    .upload-card p.sub { font-size: 14px; color: var(--text-muted); margin-bottom: 1.75rem; font-weight: 300; }
+    .drop-zone { border: 1.5px dashed var(--border); border-radius: var(--radius); padding: 3rem 2rem; text-align: center; cursor: pointer; transition: background 0.15s, border-color 0.15s; background: var(--bg); }
+    .drop-zone:hover, .drop-zone.dragging { background: var(--surface2); border-color: var(--accent); }
+    .drop-zone .dz-icon { font-size: 36px; margin-bottom: 12px; }
+    .drop-zone h3 { font-size: 15px; font-weight: 500; margin-bottom: 6px; }
+    .drop-zone p { font-size: 13px; color: var(--text-muted); }
+    input[type="file"] { display: none; }
+    .preview-bar { display: none; align-items: center; gap: 12px; padding: 12px 16px; background: var(--bg); border-radius: var(--radius); border: 1px solid var(--border); margin-top: 12px; }
+    .preview-bar .pf-name { flex: 1; font-size: 14px; }
+    .preview-bar .pf-remove { font-size: 18px; cursor: pointer; color: var(--text-muted); border: none; background: none; }
+    .analyse-btn { display: none; width: 100%; margin-top: 1rem; padding: 13px; background: var(--text); color: var(--bg); border: none; border-radius: var(--radius); font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 500; cursor: pointer; transition: opacity 0.15s; }
+    .analyse-btn:hover { opacity: 0.85; }
+    .analyse-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .error-box { display: none; margin-top: 12px; padding: 12px 16px; background: var(--high-bg); border-radius: var(--radius); font-size: 13px; color: var(--high); }
+
+    /* Loading */
+    .loading-state { display: none; flex-direction: column; align-items: center; gap: 18px; padding: 4rem 2rem; text-align: center; }
+    .spinner { width: 48px; height: 48px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.9s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-state h3 { font-family: 'DM Serif Display', serif; font-size: 20px; font-weight: 400; }
+    .loading-state p { font-size: 14px; color: var(--text-muted); max-width: 300px; }
+
+    /* Results */
+    #results-section { display: none; }
+    .back-btn { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-muted); cursor: pointer; border: none; background: none; margin-bottom: 1.5rem; padding: 0; font-family: 'DM Sans', sans-serif; }
+    .back-btn:hover { color: var(--text); }
+
+    .patient-bar { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 1rem; }
+    .pb-item { display: flex; flex-direction: column; gap: 2px; }
+    .pb-label { font-size: 11px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.06em; }
+    .pb-val { font-size: 13px; font-weight: 500; color: var(--text); }
+
+    .risk-banner { border-radius: var(--radius); padding: 1.25rem 1.5rem; display: flex; align-items: flex-start; gap: 14px; margin-bottom: 1rem; }
+    .risk-banner.low { background: var(--low-bg); }
+    .risk-banner.medium { background: var(--med-bg); }
+    .risk-banner.high { background: var(--high-bg); }
+    .risk-icon { font-size: 26px; margin-top: 2px; }
+    .low .risk-icon { color: var(--low); } .medium .risk-icon { color: var(--med); } .high .risk-icon { color: var(--high); }
+    .risk-content h2 { font-family: 'DM Serif Display', serif; font-size: 20px; font-weight: 400; display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+    .low .risk-content h2 { color: var(--low); } .medium .risk-content h2 { color: var(--med); } .high .risk-content h2 { color: var(--high); }
+    .risk-badge { font-family: 'DM Sans', sans-serif; font-size: 10px; font-weight: 500; padding: 3px 9px; border-radius: 999px; letter-spacing: 0.07em; text-transform: uppercase; }
+    .low .risk-badge { background: var(--low-pill); color: var(--low); }
+    .medium .risk-badge { background: var(--med-pill); color: var(--med); }
+    .high .risk-badge { background: var(--high-pill); color: var(--high); }
+    .risk-content p { font-size: 13px; font-weight: 300; }
+    .low .risk-content p { color: var(--low); } .medium .risk-content p { color: var(--med); } .high .risk-content p { color: var(--high); }
+
+    .critical-box { background: var(--critical-bg); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 1rem; }
+    .critical-box .crit-title { font-size: 12px; font-weight: 500; color: var(--critical); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 8px; }
+    .critical-box ul { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+    .critical-box ul li { font-size: 13px; color: var(--critical); display: flex; gap: 8px; }
+    .critical-box ul li::before { content: '⚠️'; }
+
+    .section-label { font-size: 11px; font-weight: 500; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px; margin-top: 1rem; }
+    .findings-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(175px, 1fr)); gap: 8px; }
+    .finding-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; }
+    .fc-name { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .fc-value { font-family: 'DM Serif Display', serif; font-size: 22px; color: var(--text); margin-bottom: 1px; }
+    .fc-range { font-size: 11px; color: var(--text-faint); margin-bottom: 8px; }
+    .status-pill { display: inline-block; font-size: 11px; font-weight: 500; padding: 2px 9px; border-radius: 999px; }
+    .s-normal { background: var(--low-bg); color: var(--low); }
+    .s-high { background: var(--high-bg); color: var(--high); }
+    .s-low { background: #E6F1FB; color: #0C447C; }
+    .s-borderline { background: var(--med-bg); color: var(--med); }
+    .s-critical { background: var(--critical-bg); color: var(--critical); }
+    .fc-significance { font-size: 11px; color: var(--accent); margin-top: 6px; font-weight: 500; }
+    .fc-note { font-size: 12px; color: var(--text-muted); margin-top: 4px; line-height: 1.5; font-weight: 300; }
+
+    .explanation-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; font-size: 14px; line-height: 1.75; color: var(--text); font-weight: 300; }
+    .nextsteps-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+    .nextsteps-list li { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 16px; font-size: 14px; font-weight: 300; display: flex; align-items: flex-start; gap: 10px; line-height: 1.6; }
+    .nextsteps-list li::before { content: '→'; color: var(--accent); font-weight: 500; margin-top: 1px; flex-shrink: 0; }
+
+    .followup-box { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: var(--radius); padding: 14px 18px; font-size: 14px; color: var(--text); display: flex; align-items: center; gap: 12px; }
+    .followup-box .fu-icon { font-size: 20px; }
+
+    .disclaimer { font-size: 12px; color: var(--text-faint); line-height: 1.6; padding: 14px 0; border-top: 1px solid var(--border); font-weight: 300; margin-top: 1rem; }
+    footer { text-align: center; padding: 1.5rem; font-size: 12px; color: var(--text-faint); border-top: 1px solid var(--border); }
+    .fade-in { animation: fadeIn 0.4s ease both; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+</head>
+<body>
+<header>
+  <div class="logo">Med<span>Risk</span></div>
+  <div class="tagline">AI-powered lab report analyser · Not a substitute for medical advice</div>
+</header>
+<main>
+  <div id="upload-section">
+    <div class="upload-card fade-in">
+      <h1>Analyse your lab report</h1>
+      <p class="sub">Upload a blood test, echo cardiogram, or any diagnostic report — get a clinical risk breakdown instantly.</p>
+      <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+        <div class="dz-icon">🩺</div>
+        <h3>Drop your report here</h3>
+        <p>PDF, JPG or PNG · Click to browse</p>
+      </div>
+      <input type="file" id="file-input" accept=".pdf,.jpg,.jpeg,.png">
+      <div class="preview-bar" id="preview-bar">
+        <div>📄</div>
+        <div class="pf-name" id="file-name-display">report.pdf</div>
+        <button class="pf-remove" onclick="removeFile()">✕</button>
+      </div>
+      <div class="error-box" id="error-box"></div>
+      <button class="analyse-btn" id="analyse-btn" onclick="analyseReport()">Analyse report →</button>
+    </div>
+  </div>
+
+  <div class="loading-state" id="loading-state">
+    <div class="spinner"></div>
+    <h3>Analysing your report</h3>
+    <p id="loading-msg">Reading clinical values...</p>
+  </div>
+
+  <div id="results-section">
+    <button class="back-btn" onclick="resetApp()">← Analyse another report</button>
+    <div id="patient-bar-el"></div>
+    <div id="risk-banner-el"></div>
+    <div id="critical-box-el"></div>
+    <div class="section-label">Test findings</div>
+    <div class="findings-grid" id="findings-grid"></div>
+    <div class="section-label">Clinical summary</div>
+    <div class="explanation-box" id="explanation-box"></div>
+    <div class="section-label">Suggested next steps</div>
+    <ul class="nextsteps-list" id="nextsteps-list"></ul>
+    <div class="section-label">Follow-up timeline</div>
+    <div class="followup-box" id="followup-box"></div>
+    <p class="disclaimer">⚕️ This analysis is AI-generated for informational purposes only. It is not a medical diagnosis. Always consult a qualified healthcare provider before making any health decisions.</p>
+  </div>
+</main>
+<footer>MedRisk · Powered by Groq + LLaMA 4 · Your report is never stored</footer>
+
+<script>
+  let fileData = null, fileType = null;
+  const dropZone = document.getElementById('drop-zone');
+  const fileInput = document.getElementById('file-input');
+
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragging'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragging'));
+  dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('dragging'); if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
+  fileInput.addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
+
+  function handleFile(f) {
+    const allowed = ['application/pdf','image/jpeg','image/png','image/jpg'];
+    if (!allowed.includes(f.type)) { showError('Please upload a PDF or image file (JPG, PNG).'); return; }
+    document.getElementById('error-box').style.display = 'none';
+    document.getElementById('file-name-display').textContent = f.name;
+    document.getElementById('preview-bar').style.display = 'flex';
+    document.getElementById('analyse-btn').style.display = 'block';
+    fileData = f; fileType = f.type;
+  }
+
+  function removeFile() {
+    fileData = null; fileType = null;
+    document.getElementById('preview-bar').style.display = 'none';
+    document.getElementById('analyse-btn').style.display = 'none';
+    fileInput.value = '';
+  }
+
+  function showError(msg) {
+    const eb = document.getElementById('error-box');
+    eb.textContent = msg; eb.style.display = 'block';
+  }
+
+  const loadingMsgs = ['Reading clinical values...','Checking reference ranges...','Assessing risk levels...','Preparing your results...'];
+  let msgIdx = 0, msgTimer;
+
+  function startLoading() {
+    document.getElementById('upload-section').style.display = 'none';
+    document.getElementById('results-section').style.display = 'none';
+    document.getElementById('loading-state').style.display = 'flex';
+    msgIdx = 0;
+    document.getElementById('loading-msg').textContent = loadingMsgs[0];
+    msgTimer = setInterval(() => { msgIdx = (msgIdx+1) % loadingMsgs.length; document.getElementById('loading-msg').textContent = loadingMsgs[msgIdx]; }, 2500);
+  }
+
+  function stopLoading() { clearInterval(msgTimer); document.getElementById('loading-state').style.display = 'none'; }
+
+  async function analyseReport() {
+    if (!fileData) return;
+    document.getElementById('analyse-btn').disabled = true;
+    startLoading();
+    const formData = new FormData();
+    formData.append('file', fileData);
+    try {
+      const res = await fetch('/analyse', { method: 'POST', body: formData });
+      if (!res.ok) { const err = await res.json(); throw new Error(err.detail || 'Analysis failed.'); }
+      const data = await res.json();
+      stopLoading();
+      renderResults(data);
+    } catch(e) {
+      stopLoading();
+      document.getElementById('upload-section').style.display = 'block';
+      showError('Error: ' + e.message);
+      document.getElementById('analyse-btn').disabled = false;
+    }
+  }
+
+  function renderResults(d) {
+    const level = (d.risk_level || 'Medium').toLowerCase();
+    const icons = { low: '✅', medium: '⚠️', high: '🚨' };
+
+    // Patient bar
+    const pi = d.patient_info || {};
+    document.getElementById('patient-bar-el').innerHTML = `
+      <div class="patient-bar fade-in">
+        ${pi.name ? `<div class="pb-item"><div class="pb-label">Patient</div><div class="pb-val">${pi.name}</div></div>` : ''}
+        ${pi.age ? `<div class="pb-item"><div class="pb-label">Age</div><div class="pb-val">${pi.age}</div></div>` : ''}
+        ${pi.sex ? `<div class="pb-item"><div class="pb-label">Sex</div><div class="pb-val">${pi.sex}</div></div>` : ''}
+        ${pi.report_type ? `<div class="pb-item"><div class="pb-label">Report</div><div class="pb-val">${pi.report_type}</div></div>` : ''}
+      </div>`;
+
+    // Risk banner
+    document.getElementById('risk-banner-el').innerHTML = `
+      <div class="risk-banner ${level} fade-in">
+        <div class="risk-icon">${icons[level] || '⚠️'}</div>
+        <div class="risk-content">
+          <h2>${d.risk_level} Risk <span class="risk-badge">${d.risk_level}</span></h2>
+          <p>${d.risk_summary || ''}</p>
+        </div>
+      </div>`;
+
+    // Critical flags
+    const critEl = document.getElementById('critical-box-el');
+    if (d.critical_flags && d.critical_flags.length > 0) {
+      critEl.innerHTML = `<div class="critical-box fade-in">
+        <div class="crit-title">⚠️ Critical flags requiring attention</div>
+        <ul>${d.critical_flags.map(f => `<li>${f}</li>`).join('')}</ul>
+      </div>`;
+    } else { critEl.innerHTML = ''; }
+
+    // Findings
+    document.getElementById('findings-grid').innerHTML = (d.findings || []).map(f => {
+      const sc = { Normal:'s-normal', High:'s-high', Low:'s-low', Borderline:'s-borderline', Critical:'s-critical' }[f.status] || 's-normal';
+      return `<div class="finding-card fade-in">
+        <div class="fc-name">${f.test}</div>
+        <div class="fc-value">${f.value}</div>
+        <div class="fc-range">Normal: ${f.normal_range}</div>
+        <span class="status-pill ${sc}">${f.status}</span>
+        ${f.clinical_significance ? `<div class="fc-significance">${f.clinical_significance}</div>` : ''}
+        ${f.note ? `<div class="fc-note">${f.note}</div>` : ''}
+      </div>`;
+    }).join('');
+
+    document.getElementById('explanation-box').textContent = d.explanation || '';
+    document.getElementById('nextsteps-list').innerHTML = (d.next_steps || []).map(s => `<li>${s}</li>`).join('');
+    document.getElementById('followup-box').innerHTML = `<div class="fu-icon">📅</div><span>${d.follow_up_timeline || 'Consult your doctor for follow-up schedule'}</span>`;
+
+    document.getElementById('results-section').style.display = 'block';
+  }
+
+  function resetApp() {
+    removeFile();
+    document.getElementById('results-section').style.display = 'none';
+    document.getElementById('upload-section').style.display = 'block';
+    document.getElementById('analyse-btn').disabled = false;
+  }
+</script>
+</body>
+</html>
